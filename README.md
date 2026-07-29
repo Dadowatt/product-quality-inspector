@@ -1,39 +1,19 @@
-# Contrôle Qualité Automatisé des Produits - Vision par Ordinateur
+# Vision Quality API
 
-## Description du projet
+Micro-service de contrôle qualité développé avec **FastAPI** et **Hugging Face Transformers**.
 
-Ce projet consiste à développer un micro-service d'intelligence artificielle capable d'analyser automatiquement une image de produit et de retourner un diagnostic de contrôle qualité.
-
-L'objectif est de simuler un système utilisé sur une ligne de production afin d'aider les opérateurs à identifier rapidement l'état d'un produit.
-
-L'API repose sur :
-
-- FastAPI pour l'exposition du service REST ;
-- PyTorch pour l'inférence du modèle ;
-- timm pour l'utilisation du modèle de vision ;
-- MobileNetV3 pour la classification d'image.
+L'API reçoit une image d'un produit, analyse sa surface à l'aide d'un modèle de vision par ordinateur et retourne un diagnostic indiquant si le produit est **conforme** ou présente un **défaut**.
 
 ---
 
 # Fonctionnalités
 
-L'API permet :
-
-- d'envoyer une image via une requête HTTP ;
-- de vérifier automatiquement le format de l'image ;
-- de limiter la taille des fichiers entrants ;
-- d'effectuer une prédiction avec un modèle de vision ;
-- de retourner un résultat JSON structuré.
-
-Exemple de réponse :
-
-```json
-{
-  "status": "conforme",
-  "confidence": 0.861,
-  "detected_object": "lens cap"
-}
-```
+- Inspection automatique d'images de produits
+- Détection d'anomalies (rayures, fissures, casse, défauts de finition...)
+- Modèle téléchargé automatiquement depuis Hugging Face au premier démarrage
+- Validation des fichiers envoyés
+- Réponse JSON structurée
+- Documentation interactive avec Swagger
 
 ---
 
@@ -41,64 +21,61 @@ Exemple de réponse :
 
 ```
 vision-quality-api/
-
-├── app
-│   ├── __init__.py
+├── app/
 │   ├── main.py
 │   ├── model.py
-│   └── schemas.py
-│
-├── tests
-│   └── test_image.py
-│
+│   ├── schemas.py
+│   └── __init__.py
+├── tests/
+│   ├── test_model.py
+│   ├── test_image.py
+│   └── __init__.py
 ├── models_evaluation.md
-├── README.md
 ├── requirements.txt
-├── .env.example
-└── .gitignore
+├── README.md
+└── .env
 ```
+
+---
+
+# Technologies utilisées
+
+- Python 3.12
+- FastAPI
+- Hugging Face Transformers
+- CLIP ViT-B/32
+- WinCLIP Zero-Shot
+- Pillow
+- PyTorch
 
 ---
 
 # Modèle utilisé
 
-## Modèle principal
+Le projet utilise le modèle :
 
-`timm/mobilenetv3_small_100.lamb_in1k`
+**rrs-2002/WinCLIP Zero-Shot Defect Detection**
 
-Informations :
+basé sur :
 
-- Architecture : MobileNetV3 Small
-- Dataset : ImageNet-1k
-- Licence : Apache-2.0
-- Revision :
+**openai/clip-vit-base-patch32**
 
-```
-1824797e7887cbec1990e4adbd6675960a36c589
-```
+Le micro-service implémente l'approche **WinCLIP (Zero-Shot Defect Detection)** en s'appuyant sur le modèle **openai/clip-vit-base-patch32** disponible sur Hugging Face.
 
-Le modèle a été choisi pour :
-
-- sa faible consommation mémoire ;
-- sa rapidité d'inférence ;
-- son adaptation aux environnements CPU ;
-- sa licence compatible avec un usage commercial.
+Cette approche permet de détecter des anomalies visuelles sur différentes catégories de produits sans entraînement spécifique.
 
 ---
 
 # Installation
 
-## 1. Cloner le projet
+Cloner le dépôt :
 
 ```bash
-git clone <repository-url>
-
+git clone <url-du-projet>
 cd vision-quality-api
 ```
 
----
-
-## 2. Créer l'environnement virtuel
+Créer un environnement virtuel :
 
 ```bash
 python -m venv .venv
@@ -106,15 +83,19 @@ python -m venv .venv
 
 Activer l'environnement :
 
-Linux :
+Linux / macOS
 
 ```bash
 source .venv/bin/activate
 ```
 
----
+Windows
 
-## 3. Installer les dépendances
+```bash
+.venv\Scripts\activate
+```
+
+Installer les dépendances :
 
 ```bash
 pip install -r requirements.txt
@@ -122,43 +103,33 @@ pip install -r requirements.txt
 
 ---
 
-# Configuration des variables d'environnement
+# Variables d'environnement
 
-Créer un fichier :
-
-```bash
-touch .env
-```
-
-Ajouter :
+Créer un fichier `.env` à la racine du projet :
 
 ```env
 HF_TOKEN=votre_token_huggingface
+MODEL_NAME=openai/clip-vit-base-patch32
+ANOMALY_THRESHOLD=0.75
 ```
 
-Le token Hugging Face permet l'accès authentifié aux ressources du Hub.
-
-Le fichier `.env` ne doit jamais être envoyé sur GitHub.
-
-Un fichier `.env.example` est fourni pour montrer la configuration attendue.
+Le `HF_TOKEN` est recommandé afin d'éviter les limitations de téléchargement depuis Hugging Face.
 
 ---
 
-# Lancer l'application
-
-Démarrer le serveur :
+# Lancer l'API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-L'API sera disponible à :
+L'API est disponible sur :
 
 ```
 http://127.0.0.1:8000
 ```
 
-Documentation interactive :
+Documentation Swagger :
 
 ```
 http://127.0.0.1:8000/docs
@@ -166,125 +137,74 @@ http://127.0.0.1:8000/docs
 
 ---
 
-# Utilisation de l'API
+# Endpoint
 
-## Endpoint
+## POST /inspect-image
 
-```
-POST /inspect-image
-```
+Analyse une image et retourne un diagnostic.
 
-## Format attendu
+### Paramètres
 
-La requête doit contenir :
+| Nom | Type | Description |
+|------|------|-------------|
+| image | File | Image du produit |
+| category | String | Catégorie du produit (ex. : metal_nut, bottle, screw...) |
 
-```
-multipart/form-data
-```
+---
 
-avec un fichier image :
+# Exemple avec curl
 
-```
-file: image.jpg
-```
-
-Formats acceptés :
-
-- JPEG
-- PNG
-
-Taille maximale :
-
-```
-5 MB
+```bash
+curl -X POST "http://127.0.0.1:8000/inspect-image" \
+-F "image=@tests/test_images/piece_test.jpg" \
+-F "category=metal_nut"
 ```
 
 ---
 
-# Exemple avec Swagger
-
-1. Ouvrir :
-
-```
-http://127.0.0.1:8000/docs
-```
-
-2. Sélectionner :
-
-```
-POST /inspect-image
-```
-
-3. Cliquer sur :
-
-```
-Try it out
-```
-
-4. Envoyer une image.
-
----
-
-# Exemple de résultat
-
-Réponse :
+# Exemple de réponse
 
 ```json
 {
-  "status": "conforme",
-  "confidence": 0.861,
-  "detected_object": "lens cap"
+  "status": "defaut",
+  "confidence": 0.763,
+  "anomaly_score": 0.763
 }
 ```
 
 ---
 
-# Sécurité et robustesse
-
-Le service intègre :
-
-- validation du type MIME ;
-- limitation de taille des images ;
-- gestion des erreurs d'ouverture d'image ;
-- chargement unique du modèle en mémoire ;
-- séparation entre API et logique IA.
-
----
-
-# Limites actuelles
-
-Le modèle MobileNetV3 utilisé est un modèle généraliste entraîné sur ImageNet-1k.
-
-Il permet de reconnaître des objets mais n'a pas été entraîné spécifiquement pour détecter :
-
-- rayures ;
-- fissures ;
-- défauts de fabrication ;
-- problèmes de finition.
-
-Pour une utilisation industrielle réelle, une étape de fine-tuning serait nécessaire avec un dataset contenant :
-
-- images de produits conformes ;
-- images de produits défectueux.
-
----
-
 # Tests
 
-Lancer les tests :
+Tester directement le modèle :
 
 ```bash
-pytest
+python -m tests.test_model
+```
+
+Tester l'API :
+
+```bash
+curl -X POST "http://127.0.0.1:8000/inspect-image" \
+-F "image=@tests/test_images/piece_test.jpg" \
+-F "category=metal_nut"
 ```
 
 ---
 
-# Améliorations futures
+# Sécurité
 
-Les évolutions possibles :
+Le micro-service intègre plusieurs mécanismes de protection :
 
-- entraînement sur un dataset industriel personnalisé ;
-- ajout d'un vrai classifieur "conforme/défaut" ;
-- ajout d'une base historique des inspections ;
-- déploiement Docker ;
-- monitoring des performances du modèle.
+- validation du type de fichier ;
+- limitation de la taille des images ;
+- gestion des images invalides ou corrompues ;
+- gestion des erreurs d'inférence ;
+- configuration via variables d'environnement.
+
+---
+
+# Auteur
+**Dado Watt**
+
+Projet réalisé dans le cadre d'un atelier de développement d'un micro-service d'intelligence artificielle avec FastAPI et Hugging Face.

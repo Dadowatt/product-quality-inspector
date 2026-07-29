@@ -1,42 +1,30 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
-
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from PIL import Image
 from io import BytesIO
 
 from app.model import predict_image
 from app.schemas import InspectionResponse
 
+# ==========================
+# Configuration
+# ==========================
 
-app = FastAPI()
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 Mo
 
 
 # ==========================
-# Configuration sécurité
+# Création de l'API
 # ==========================
 
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-
-ALLOWED_TYPES = [
-    "image/jpeg",
-    "image/png"
-]
-
-
-# ==========================
-# Route principale
-# ==========================
-
-@app.get("/")
-def home():
-
-    return {
-        "message": "API contrôle qualité opérationnelle"
-    }
+app = FastAPI(
+    title="Vision Quality API",
+    description="API de contrôle qualité par détection d'anomalies",
+    version="1.0"
+)
 
 
 # ==========================
-# Inspection image
+# Endpoint inspection image
 # ==========================
 
 @app.post(
@@ -44,58 +32,78 @@ def home():
     response_model=InspectionResponse
 )
 async def inspect_image(
-    file: UploadFile = File(...)
+    image: UploadFile = File(...),
+    category: str = Form("metal_nut")
 ):
 
-    # Vérification du format MIME
+    # ==========================
+    # Validation du fichier image
+    # ==========================
 
-    if file.content_type not in ALLOWED_TYPES:
-
+    if not image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=400,
-            detail="Format image non supporté. Utilisez PNG ou JPEG."
+            detail="Le fichier envoyé n'est pas une image"
         )
 
-
-    # Lecture du fichier en mémoire
-
-    contents = await file.read()
-
-
+    # ==========================
     # Vérification de la taille
+    # ==========================
 
-    if len(contents) > MAX_FILE_SIZE:
+    image_bytes = await image.read()
 
+    if len(image_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(
             status_code=413,
-            detail="Image trop volumineuse (maximum 5 MB)."
+            detail="Image trop volumineuse (maximum 5 Mo)"
         )
+    
 
+    # ==========================
+    # Lecture et validation de l'image
+    # ==========================
 
     try:
+        pil_image = Image.open(
+            BytesIO(image_bytes)
+        )
 
-        image = Image.open(
-            BytesIO(contents)
+        pil_image = pil_image.convert("RGB")
+
+
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Image invalide ou corrompue"
         )
 
 
-        result = predict_image(image)
+    # ==========================
+    # Analyse IA
+    # ==========================
 
-
-        return {
-
-            "status": "conforme",
-
-            "confidence": result["confidence"],
-
-            "detected_object": result["label"]
-
-        }
-
+    try:
+        result = predict_image(
+            pil_image,
+            category=category
+        )
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
-            detail=f"Erreur traitement image : {str(e)}"
+            detail=f"Erreur pendant l'analyse du modèle : {str(e)}"
         )
+
+
+    return result
+
+
+# ==========================
+# Route de test
+# ==========================
+
+@app.get("/")
+def root():
+    return {
+        "message": "Vision Quality API opérationnelle"
+    }
