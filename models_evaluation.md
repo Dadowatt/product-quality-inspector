@@ -17,7 +17,9 @@ Les critères de comparaison sont :
 
 **Type :** Détection d'anomalies OpenVINO
 
-**Licence :** MIT
+**Licence :** Apache 2.0
+
+**Taille :** 377MB
 
 ### Avantages
 
@@ -37,11 +39,15 @@ Ce modèle offre de bonnes performances pour des pièces métalliques, mais son 
 
 ---
 
-## Modèle 2 : rrs-2002/WinCLIP Zero-Shot Defect Detection
+## Modèle 2 : Approche WinCLIP basée sur CLIP ViT-B/32
 
-**Modèle utilisé :** openai/clip-vit-base-patch32
+**Backbone utilisé :** openai/clip-vit-base-patch32
+
+**Méthode :** Implémentation inspirée de WinCLIP (Zero-Shot Defect Detection)
 
 **Licence :** MIT
+
+**Taille :** ~600 Mo (poids du modèle CLIP ViT-B/32)
 
 ### Avantages
 
@@ -61,7 +67,7 @@ Ce modèle offre de bonnes performances pour des pièces métalliques, mais son 
 
 ### Conclusion
 
-Ce modèle est plus adapté au contexte du projet car il permet d'inspecter différents types de produits sans devoir entraîner un modèle spécifique pour chaque catégorie.
+L'approche WinCLIP repose sur le modèle CLIP ViT-B/32 pour effectuer une détection d'anomalies en zero-shot. Dans ce projet, nous avons implémenté cette approche en utilisant le backbone `openai/clip-vit-base-patch32` et les bibliothèques Hugging Face Transformers. Cette solution permet d'inspecter plusieurs catégories de produits sans entraîner un modèle spécifique pour chacune d'elles.
 
 ---
 
@@ -69,7 +75,7 @@ Ce modèle est plus adapté au contexte du projet car il permet d'inspecter diff
 
 | Critère  | Keyven / AnomalyDetection-MVTech-Metal | WinCLIP (OpenAI CLIP ViT-B/32) |
 |:---------|:---------------------------------------|:-------------------------------|
-| **Licence**                   |            MIT ✅ | MIT ✅                         |
+| **Licence**                   |  Apache 2.0    ✅ | MIT ✅                         |
 | **Architecture**              | OpenVINO          |CLIP Vision Transformer         |
 | **Type de détection**         |Anomaly Detection  |Zero-shot Anomaly Detection     |
 | **Entraînement requis**       | Oui               |  Non                           |    
@@ -83,7 +89,7 @@ Ce modèle est plus adapté au contexte du projet car il permet d'inspecter diff
 
 # Modèle retenu
 
-Le modèle **WinCLIP** a été retenu pour le développement du micro-service.
+L'approche WinCLIP, implémentée à partir du backbone `openai/clip-vit-base-patch32`, a été retenue pour le développement du micro-service.
 
 ### Raisons du choix
 

@@ -68,9 +68,6 @@ async def inspect_image(
             BytesIO(image_bytes)
         )
 
-        pil_image = pil_image.convert("RGB")
-
-
     except Exception:
         raise HTTPException(
             status_code=400,
@@ -94,9 +91,7 @@ async def inspect_image(
             detail=f"Erreur pendant l'analyse du modèle : {str(e)}"
         )
 
-
     return result
-
 
 # ==========================
 # Route de test
