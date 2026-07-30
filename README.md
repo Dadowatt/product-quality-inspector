@@ -4,13 +4,17 @@ Micro-service de contrôle qualité développé avec **FastAPI** et **Hugging Fa
 
 L'API reçoit une image d'un produit, analyse sa surface à l'aide d'un modèle de vision par ordinateur et retourne un diagnostic indiquant si le produit est **conforme** ou présente un **défaut**.
 
+Le projet s'appuie sur le modèle **openai/clip-vit-base-patch32** de Hugging Face et implémente une approche **inspirée de WinCLIP** pour réaliser une détection d'anomalies en **zero-shot**.
+
 ---
 
 # Fonctionnalités
 
 - Inspection automatique d'images de produits
 - Détection d'anomalies (rayures, fissures, casse, défauts de finition...)
-- Modèle téléchargé automatiquement depuis Hugging Face au premier démarrage
+- Approche inspirée de WinCLIP basée sur CLIP
+- Analyse par fenêtres glissantes (Sliding Windows)
+- Génération automatique de prompts textuels
 - Validation des fichiers envoyés
 - Réponse JSON structurée
 - Documentation interactive avec Swagger
@@ -22,18 +26,20 @@ L'API reçoit une image d'un produit, analyse sa surface à l'aide d'un modèle 
 ```
 vision-quality-api/
 ├── app/
+│   ├── config.py
 │   ├── main.py
 │   ├── model.py
 │   ├── schemas.py
 │   └── __init__.py
 ├── tests/
+│   ├── test_api.py
 │   ├── test_model.py
-│   ├── test_image.py
+│   ├── test_images/
 │   └── __init__.py
 ├── models_evaluation.md
 ├── requirements.txt
 ├── README.md
-└── .env
+└── .env.example
 ```
 
 ---
@@ -43,26 +49,31 @@ vision-quality-api/
 - Python 3.12
 - FastAPI
 - Hugging Face Transformers
-- CLIP ViT-B/32
-- WinCLIP Zero-Shot
-- Pillow
 - PyTorch
+- Pillow
+- NumPy
+- SciPy
+- CLIP ViT-B/32 (Vision Transformer)
 
 ---
 
 # Modèle utilisé
 
-Le projet utilise le modèle :
-
-**rrs-2002/WinCLIP Zero-Shot Defect Detection**
-
-basé sur :
+Le micro-service utilise le modèle Hugging Face :
 
 **openai/clip-vit-base-patch32**
 
-Le micro-service implémente l'approche **WinCLIP (Zero-Shot Defect Detection)** en s'appuyant sur le modèle **openai/clip-vit-base-patch32** disponible sur Hugging Face.
+Ce modèle sert de **backbone de vision** pour extraire les représentations des images et des descriptions textuelles.
 
-Cette approche permet de détecter des anomalies visuelles sur différentes catégories de produits sans entraînement spécifique.
+Afin de réaliser la détection d'anomalies, le projet implémente une approche **inspirée de WinCLIP**, reposant sur :
+
+- la génération de prompts décrivant des états conformes et défectueux ;
+- l'encodage des images et des textes avec CLIP ;
+- une analyse par fenêtres glissantes (Sliding Windows) ;
+- la construction d'une carte d'anomalies (heatmap) ;
+- le calcul d'un score d'anomalie permettant de déterminer si le produit est conforme ou non.
+
+Cette approche permet d'effectuer une détection **zero-shot**, c'est-à-dire sans entraîner un modèle spécifique pour chaque type de produit.
 
 ---
 
@@ -83,13 +94,13 @@ python -m venv .venv
 
 Activer l'environnement :
 
-Linux / macOS
+### Linux / macOS
 
 ```bash
 source .venv/bin/activate
 ```
 
-Windows
+### Windows
 
 ```bash
 .venv\Scripts\activate
@@ -105,7 +116,13 @@ pip install -r requirements.txt
 
 # Variables d'environnement
 
-Créer un fichier `.env` à la racine du projet :
+Créer un fichier `.env` à partir de `.env.example` :
+
+```bash
+cp .env.example .env
+```
+
+Puis renseigner :
 
 ```env
 HF_TOKEN=votre_token_huggingface
@@ -113,7 +130,11 @@ MODEL_NAME=openai/clip-vit-base-patch32
 ANOMALY_THRESHOLD=0.75
 ```
 
-Le `HF_TOKEN` est recommandé afin d'éviter les limitations de téléchargement depuis Hugging Face.
+### Description
+
+- **HF_TOKEN** : jeton Hugging Face (optionnel pour les modèles publics, recommandé afin d'éviter les limitations de téléchargement).
+- **MODEL_NAME** : modèle CLIP utilisé.
+- **ANOMALY_THRESHOLD** : seuil de décision entre un produit conforme et un produit défectueux.
 
 ---
 
@@ -141,7 +162,7 @@ http://127.0.0.1:8000/docs
 
 ## POST /inspect-image
 
-Analyse une image et retourne un diagnostic.
+Analyse une image de produit et retourne un diagnostic.
 
 ### Paramètres
 
@@ -167,10 +188,28 @@ curl -X POST "http://127.0.0.1:8000/inspect-image" \
 ```json
 {
   "status": "defaut",
-  "confidence": 0.763,
-  "anomaly_score": 0.763
+  "confidence": 0.8,
+  "anomaly_score": 0.8
 }
 ```
+
+---
+
+# Pipeline de traitement
+
+Le traitement d'une image suit les étapes suivantes :
+
+1. Réception de l'image par FastAPI.
+2. Validation du type et de la taille du fichier.
+3. Ouverture de l'image.
+4. Prétraitement avec le **CLIPProcessor**.
+5. Génération des prompts textuels.
+6. Découpage de l'image en fenêtres glissantes.
+7. Extraction des caractéristiques visuelles avec **CLIP**.
+8. Comparaison entre les représentations des images et des prompts.
+9. Construction d'une heatmap d'anomalies.
+10. Calcul d'un score d'anomalie.
+11. Retour du diagnostic au format JSON.
 
 ---
 
@@ -185,6 +224,12 @@ python -m tests.test_model
 Tester l'API :
 
 ```bash
+python -m tests.test_api
+```
+
+Ou avec `curl` :
+
+```bash
 curl -X POST "http://127.0.0.1:8000/inspect-image" \
 -F "image=@tests/test_images/piece_test.jpg" \
 -F "category=metal_nut"
@@ -196,15 +241,16 @@ curl -X POST "http://127.0.0.1:8000/inspect-image" \
 
 Le micro-service intègre plusieurs mécanismes de protection :
 
-- validation du type de fichier ;
-- limitation de la taille des images ;
+- validation du type MIME des fichiers ;
+- limitation de la taille des images (5 Mo maximum) ;
 - gestion des images invalides ou corrompues ;
-- gestion des erreurs d'inférence ;
-- configuration via variables d'environnement.
+- gestion des exceptions lors de l'inférence ;
+- configuration via des variables d'environnement.
 
 ---
 
 # Auteur
+
 **Dado Watt**
 
-Projet réalisé dans le cadre d'un atelier de développement d'un micro-service d'intelligence artificielle avec FastAPI et Hugging Face.
+Projet réalisé dans le cadre d'un atelier de développement d'un micro-service d'intelligence artificielle avec **FastAPI** et **Hugging Face Transformers**.
